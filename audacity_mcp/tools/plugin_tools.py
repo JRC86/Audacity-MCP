@@ -222,6 +222,65 @@ def _parse_menu_categories(result: dict) -> dict[str, set[str]]:
     return categories
 
 
+def _plugin_command_id(menu_id: str) -> str | None:
+    """Derive Audacity's scripting ID from an effect registration ID.
+
+    Current Audacity menus expose the PluginID created by PluginManager::GetID,
+    while GetInfo Commands exposes PluginManager::GetCommandIdentifier. Audacity
+    constructs those values as:
+
+        Effect_<family>_<vendor>_<internal symbol>_<path>
+        CamelCase(<internal symbol split on spaces>)
+
+    Non-effect menu commands deliberately return None. This is important for
+    Tool menus, which also contain powerful generic scripting commands.
+    """
+    if not menu_id.startswith("Effect_"):
+        return None
+
+    fields = menu_id.split("_", 4)
+    if len(fields) != 5:
+        raise _command_error(f"Malformed Audacity plugin registration id: {menu_id}")
+
+    plugin_type, _family, _vendor, symbol, path = fields
+    if plugin_type != "Effect" or not symbol or not path:
+        raise _command_error(f"Malformed Audacity plugin registration id: {menu_id}")
+
+    tokens = [token for token in symbol.strip(" ").split(" ") if token]
+    if not tokens:
+        raise _command_error(f"Audacity plugin registration id has no symbol: {menu_id}")
+    command_id = "".join(token[:1].upper() + token[1:].lower() for token in tokens)
+    _validate_text(
+        command_id,
+        f"Derived command id for plugin registration id {menu_id}",
+        _MAX_IDENTIFIER_LENGTH,
+    )
+    return command_id
+
+
+def _cross_reference_plugins(
+    commands: dict[str, dict],
+    menu_categories: dict[str, set[str]],
+) -> dict[str, set[str]]:
+    """Map menu PluginIDs to command IDs, failing closed on ambiguity."""
+    matched: dict[str, set[str]] = {}
+    source_ids: dict[str, str] = {}
+
+    for menu_id, categories in menu_categories.items():
+        command_id = _plugin_command_id(menu_id)
+        if command_id is None or command_id not in commands:
+            continue
+        if command_id in matched:
+            raise _command_error(
+                "Duplicate Audacity plugin menu entries map to command id "
+                f"{command_id}: {source_ids[command_id]} and {menu_id}"
+            )
+        matched[command_id] = set(categories)
+        source_ids[command_id] = menu_id
+
+    return matched
+
+
 def _tool_allowlist() -> set[str]:
     return {
         item.strip()
@@ -248,11 +307,11 @@ async def _discover_plugins(client) -> dict[str, dict]:
     menu_result = await client.execute("GetInfo", Type="Menus", Format="JSON")
     commands = _parse_commands(command_result)
     menu_categories = _parse_menu_categories(menu_result)
+    plugin_categories = _cross_reference_plugins(commands, menu_categories)
 
     plugins: dict[str, dict] = {}
-    for command_id in commands.keys() & menu_categories.keys():
+    for command_id, categories in plugin_categories.items():
         metadata = commands[command_id]
-        categories = menu_categories[command_id]
         authorized, blocked_reason = _authorization(command_id, categories)
         plugin = {
             **metadata,

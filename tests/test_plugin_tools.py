@@ -5,9 +5,11 @@ import pytest
 from mcp.server.fastmcp import FastMCP
 
 from audacity_mcp.tools.plugin_tools import (
+    _cross_reference_plugins,
     _extract_json_array,
     _parse_commands,
     _parse_menu_categories,
+    _plugin_command_id,
 )
 from audacity_mcp_shared.error_codes import AudacityMCPError, ErrorCode
 
@@ -64,17 +66,38 @@ COMMANDS = [
 MENUS = [
     {"depth": 0, "flags": 0, "accel": ""},
     {"depth": 1, "flags": 0, "accel": "", "id": "ManageEffects"},
-    {"depth": 1, "flags": 0, "accel": "", "id": "Echo"},
+    {
+        "depth": 1,
+        "flags": 0,
+        "accel": "",
+        "id": "Effect_Audacity_Audacity_Echo_Built-in Effect: Echo",
+    },
     {"depth": 1, "flags": 0, "accel": "", "id": "MenuOnly"},
     {"depth": 0, "flags": 0, "accel": ""},
     {"depth": 1, "flags": 0, "accel": "", "id": "ManageGenerators"},
-    {"depth": 2, "flags": 0, "accel": "", "id": "Chirp"},
+    {
+        "depth": 2,
+        "flags": 0,
+        "accel": "",
+        "id": "Effect_Audacity_Audacity_Chirp_Built-in Effect: Chirp",
+    },
     {"depth": 0, "flags": 0, "accel": ""},
     {"depth": 1, "flags": 0, "accel": "", "id": "ManageAnalyzers"},
-    {"depth": 1, "flags": 0, "accel": "", "id": "HittaKlippning"},
+    {
+        "depth": 1,
+        "flags": 0,
+        "accel": "",
+        "id": "Effect_Nyquist_Audacity_Hitta Klippning_C:\\Program Files\\Audacity\\plug-ins\\find.ny",
+    },
     {"depth": 0, "flags": 0, "accel": ""},
     {"depth": 1, "flags": 0, "accel": "", "id": "ManageTools"},
-    {"depth": 1, "flags": 0, "accel": "", "id": "VerktygÅ"},
+    {
+        "depth": 1,
+        "flags": 0,
+        "accel": "",
+        "id": "Effect_Nyquist_Audacity_Verktyg Å_C:\\Program Files\\Audacity\\plug-ins\\tool.ny",
+    },
+    {"depth": 1, "flags": 0, "accel": "", "id": "Export2"},
 ]
 
 
@@ -168,11 +191,56 @@ class TestMetadataParsing:
 
     def test_classifies_localized_menu_sections_by_stable_sentinel(self):
         categories = _parse_menu_categories(_result(MENUS))
-        assert categories["Echo"] == {"effect"}
-        assert categories["Chirp"] == {"generate"}
-        assert categories["HittaKlippning"] == {"analyze"}
-        assert categories["VerktygÅ"] == {"tool"}
+        assert categories[
+            "Effect_Audacity_Audacity_Echo_Built-in Effect: Echo"
+        ] == {"effect"}
+        assert categories[
+            "Effect_Audacity_Audacity_Chirp_Built-in Effect: Chirp"
+        ] == {"generate"}
+        assert categories[
+            "Effect_Nyquist_Audacity_Hitta Klippning_C:\\Program Files\\Audacity\\plug-ins\\find.ny"
+        ] == {"analyze"}
+        assert categories[
+            "Effect_Nyquist_Audacity_Verktyg Å_C:\\Program Files\\Audacity\\plug-ins\\tool.ny"
+        ] == {"tool"}
         assert "ManageEffects" not in categories
+
+    def test_derives_scripting_id_from_current_audacity_plugin_id(self):
+        assert (
+            _plugin_command_id(
+                "Effect_Audacity_Audacity_DTMF Tones_Built-in Effect: DTMF Tones"
+            )
+            == "DtmfTones"
+        )
+        assert (
+            _plugin_command_id(
+                "Effect_Nyquist_Audacity_Åtgärda klipp_C:\\Program Files\\Audacity\\plug-ins\\clipfix.ny"
+            )
+            == "ÅtgärdaKlipp"
+        )
+
+    def test_generic_menu_commands_are_not_plugin_evidence(self):
+        assert _plugin_command_id("Export2") is None
+        categories = _parse_menu_categories(_result(MENUS))
+        matched = _cross_reference_plugins(
+            _parse_commands(_result(COMMANDS)), categories
+        )
+        assert "Export2" not in matched
+
+    def test_rejects_malformed_plugin_registration_id(self):
+        with pytest.raises(AudacityMCPError) as exc:
+            _plugin_command_id("Effect_missing_fields")
+        assert exc.value.code == ErrorCode.COMMAND_FAILED
+
+    def test_rejects_ambiguous_plugin_menu_mapping(self):
+        commands = _parse_commands(_result([COMMANDS[0]]))
+        categories = {
+            "Effect_Audacity_Audacity_Echo_Built-in Effect: Echo": {"effect"},
+            "Effect_Nyquist_Other_Echo_C:\\plug-ins\\echo.ny": {"effect"},
+        }
+        with pytest.raises(AudacityMCPError) as exc:
+            _cross_reference_plugins(commands, categories)
+        assert exc.value.code == ErrorCode.COMMAND_FAILED
 
     def test_rejects_missing_category_sentinels(self):
         menus = [{"depth": 0, "label": "File"}, {"depth": 1, "id": "Export2"}]

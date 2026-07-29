@@ -16,6 +16,9 @@ All notable changes to AudacityMCP will be documented in this file.
   against Audacity's current schema before execution.
 - Added a narrowly scoped compatibility repair for Windows paths that Audacity
   3.x emits without JSON escaping in command defaults and menu labels.
+- Added Audacity 3.7 compatibility for menu plugin registration IDs, mapping
+  their stable internal symbols to scripting IDs while excluding ordinary
+  Tool-menu commands from plugin authorization.
 - Added focused tests for language-agnostic metadata handling, pagination,
   fail-closed discovery, authorization, injection protection, and parameter
   validation.
