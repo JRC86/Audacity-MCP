@@ -14,6 +14,8 @@ All notable changes to AudacityMCP will be documented in this file.
 - Tool candidates require an exact ID in
   `AUDACITY_MCP_ALLOWED_TOOL_PLUGINS`; all dynamic parameters are checked
   against Audacity's current schema before execution.
+- Added a narrowly scoped compatibility repair for Windows paths that Audacity
+  3.x emits without JSON escaping in command defaults and menu labels.
 - Added focused tests for language-agnostic metadata handling, pagination,
   fail-closed discovery, authorization, injection protection, and parameter
   validation.

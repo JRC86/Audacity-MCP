@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import re
 
 from mcp.server.fastmcp import FastMCP
 
@@ -15,6 +16,8 @@ _CATEGORY_SENTINELS = {
     "tool": "ManageTools",
 }
 _SAFE_CATEGORIES = {"effect", "generate", "analyze"}
+_JSON_STRING_TOKEN = re.compile(r'"(?:\\.|[^"\\])*"')
+_WINDOWS_DRIVE_PATH = re.compile(r"[A-Za-z]:\\")
 _TOOL_ALLOWLIST_ENV = "AUDACITY_MCP_ALLOWED_TOOL_PLUGINS"
 _MAX_IDENTIFIER_LENGTH = 512
 _MAX_QUERY_LENGTH = 256
@@ -27,6 +30,50 @@ def _command_error(message: str) -> AudacityMCPError:
     return AudacityMCPError(ErrorCode.COMMAND_FAILED, message)
 
 
+def _repair_windows_paths(text: str) -> str:
+    """Escape drive-letter paths that Audacity 3.x emits as invalid JSON."""
+
+    def repair_token(match: re.Match) -> str:
+        content = match.group(0)[1:-1]
+        path_match = _WINDOWS_DRIVE_PATH.search(content)
+        if path_match is None:
+            return match.group(0)
+
+        repaired: list[str] = []
+        path_start = path_match.start()
+        index = 0
+        while index < len(content):
+            char = content[index]
+            if char != "\\" or index < path_start:
+                repaired.append(char)
+                index += 1
+                continue
+            if index + 1 < len(content) and content[index + 1] == "\\":
+                repaired.append("\\\\")
+                index += 2
+                continue
+            repaired.append("\\\\")
+            index += 1
+        return f'"{"".join(repaired)}"'
+
+    return _JSON_STRING_TOKEN.sub(repair_token, text)
+
+
+def _decode_json_array(text: str) -> list | None:
+    decoder = json.JSONDecoder()
+    try:
+        parsed, _ = decoder.raw_decode(text)
+    except json.JSONDecodeError:
+        repaired = _repair_windows_paths(text)
+        if repaired == text:
+            return None
+        try:
+            parsed, _ = decoder.raw_decode(repaired)
+        except json.JSONDecodeError:
+            return None
+    return parsed if isinstance(parsed, list) else None
+
+
 def _extract_json_array(result: dict, response_name: str) -> list:
     """Extract a JSON array from current and older Audacity client responses."""
     if not isinstance(result, dict):
@@ -35,7 +82,6 @@ def _extract_json_array(result: dict, response_name: str) -> list:
         detail = result.get("message") or "Audacity reported command failure"
         raise _command_error(f"{response_name} failed: {detail}")
 
-    decoder = json.JSONDecoder()
     for field in ("message", "raw"):
         value = result.get(field)
         if not isinstance(value, str) or not value.strip():
@@ -44,11 +90,8 @@ def _extract_json_array(result: dict, response_name: str) -> list:
         # Modern parse_response puts the JSON in message. Older server
         # versions may leave it in raw, optionally followed by batch status.
         text = value.strip()
-        try:
-            parsed, _ = decoder.raw_decode(text)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, list):
+        parsed = _decode_json_array(text)
+        if parsed is not None:
             return parsed
 
     raise _command_error(f"{response_name} did not return a valid JSON array")

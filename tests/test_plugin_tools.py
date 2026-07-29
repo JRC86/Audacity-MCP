@@ -123,6 +123,23 @@ class TestJsonExtraction:
         result["raw"] += "\nBatchCommand finished: OK"
         assert _extract_json_array(result, "test") == []
 
+    def test_repairs_unescaped_windows_path_from_audacity(self):
+        raw = (
+            '[{"id":"Export2","name":"Export2","params":['
+            '{"key":"Filename","type":"string",'
+            '"default":"C:\\Users\\Tester\\Documents\\exported.wav"}]},'
+            '{"depth":1,"label":"Recent: C:\\Users\\Tester\\Project.aup3"}]'
+            "\nBatchCommand finished: OK"
+        )
+        parsed = _extract_json_array(
+            {"success": True, "message": "", "raw": raw, "data": {}},
+            "test",
+        )
+        assert parsed[0]["params"][0]["default"] == (
+            "C:\\Users\\Tester\\Documents\\exported.wav"
+        )
+        assert parsed[1]["label"] == "Recent: C:\\Users\\Tester\\Project.aup3"
+
     def test_rejects_failed_response_even_with_json(self):
         with pytest.raises(AudacityMCPError) as exc:
             _extract_json_array(_result([], success=False), "test")

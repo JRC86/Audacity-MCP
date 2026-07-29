@@ -460,7 +460,7 @@ AudacityMCP/
 │   ├── constants.py            # Pipe paths, timeouts, allowed formats
 │   ├── error_codes.py          # Typed error codes (pipe/command/validation)
 │   └── pipe_protocol.py        # Command formatting and response parsing
-├── tests/                      # 112 tests
+├── tests/                      # 113 tests
 ├── docs/
 │   ├── INSTALLATION.md         # Detailed setup guide
 │   └── TOOLS.md                # Complete tool reference
