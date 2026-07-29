@@ -45,6 +45,14 @@ class TestFormatCommand:
             format_command("Import2", Filename="file\x00evil")
         assert exc_info.value.code == ErrorCode.INJECTION_DETECTED
 
+    def test_dangerous_character_predicate(self):
+        from audacity_mcp_shared.pipe_protocol import has_dangerous_chars
+
+        assert has_dangerous_chars("line\nbreak")
+        assert has_dangerous_chars("carriage\rreturn")
+        assert has_dangerous_chars("null\x00byte")
+        assert not has_dangerous_chars('safe value = "quoted"')
+
 
 class TestParseResponse:
     def test_success_response(self):

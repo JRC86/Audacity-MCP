@@ -1,12 +1,13 @@
 # Tool Reference
 
-Complete reference for all 131 tools in AudacityMCP.
+Complete reference for all 134 tools in AudacityMCP.
 
 ---
 
 ## Table of Contents
 
 - [Effects (30 tools)](#effects)
+- [Plugins (3 tools)](#plugins)
 - [Cleanup & Mastering (18 tools)](#cleanup--mastering)
 - [Editing (13 tools)](#editing)
 - [Project Management (12 tools)](#project-management)
@@ -271,6 +272,75 @@ Apply tremolo (volume oscillation) effect.
 | `frequency` | float | 5.0 | 1-1000 | Tremolo speed in Hz |
 | `depth` | float | 40.0 | 0-100 | Tremolo depth (%) |
 | `waveform` | int | 0 | 0-4 | 0=Sine, 1=Triangle, 2=Sawtooth, 3=InverseSawtooth, 4=Square |
+
+---
+
+## Plugins
+
+Audacity exposes built-in and third-party effects through the same scripting
+metadata, so these tools describe entries as **plugin candidates**. Discovery
+includes enabled Effect, Generate, Analyze, and Tool entries. Realtime effect
+stacks and plugin installation or enable/disable management are not supported.
+
+Installed plugins are trusted local code and cannot be sandboxed by
+AudacityMCP. Effect plugins usually process the current selection, Generate
+plugins create audio, and Analyze plugins may create labels or other analysis
+output.
+
+Discovery is language-agnostic: category classification uses stable Audacity
+scripting IDs instead of translated menu labels. Display names, parameter keys,
+and enum choices are preserved exactly as reported by the active Audacity
+installation.
+
+### `plugin_list`
+
+Return a compact, sorted, paginated list of enabled plugin candidates.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `category` | str | `"all"` | `all`, `effect`, `generate`, `analyze`, or `tool` |
+| `query` | str | `""` | Case-insensitive search over scripting ID and reported display name |
+| `limit` | int | `50` | Page size from 1 to 200 |
+| `offset` | int | `0` | Zero-based pagination offset |
+
+Each result includes the exact scripting ID, reported display name, categories,
+parameter count, and authorization state. Use `next_offset` to request another
+page.
+
+### `plugin_get`
+
+Return full metadata and the exact Audacity parameter schema for one candidate.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `plugin_id` | str | Exact, case-sensitive ID returned by `plugin_list` |
+
+The response includes parameter keys, types, defaults, enum choices, URL, tip,
+categories, and authorization state. Parameter names and enum values are
+language-dependent metadata from Audacity and must be passed back exactly.
+
+### `plugin_apply`
+
+Apply an enabled candidate after rediscovering and validating its current
+metadata.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `plugin_id` | str | — | Exact scripting ID returned by `plugin_list` |
+| `parameters` | object | `None` | Keys and typed values from `plugin_get`; omitted keys use Audacity behavior |
+
+Effect, Generate, and Analyze candidates are dynamically authorized only when
+they occur in both Audacity's command metadata and the corresponding menu.
+Tool entries are discoverable but require their exact ID in the comma-separated
+environment variable below before execution:
+
+```text
+AUDACITY_MCP_ALLOWED_TOOL_PLUGINS=MyTrustedTool,AnotherTrustedTool
+```
+
+Unknown parameters, invalid types or enums, non-finite numbers, unsafe control
+characters, and unauthorized commands are rejected before anything is sent to
+Audacity.
 
 ---
 

@@ -5,8 +5,13 @@ from audacity_mcp_shared.error_codes import AudacityMCPError, ErrorCode
 _DANGEROUS_CHARS = re.compile(r"[\n\r\x00]")
 
 
+def has_dangerous_chars(value: str) -> bool:
+    """Return whether a value contains characters forbidden by the pipe protocol."""
+    return _DANGEROUS_CHARS.search(value) is not None
+
+
 def _validate_value(value: str) -> str:
-    if _DANGEROUS_CHARS.search(value):
+    if has_dangerous_chars(value):
         raise AudacityMCPError(
             ErrorCode.INJECTION_DETECTED,
             f"Value contains illegal characters: {value!r}",

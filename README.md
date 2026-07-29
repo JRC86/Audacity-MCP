@@ -22,7 +22,7 @@
 
 ---
 
-AudacityMCP connects any MCP-compatible AI assistant to [Audacity](https://www.audacityteam.org/), giving it full control over audio editing through 131 tools spanning effects, cleanup, mastering, transcription, and more. Talk to your AI assistant and it edits your audio in real-time.
+AudacityMCP connects any MCP-compatible AI assistant to [Audacity](https://www.audacityteam.org/), giving it full control over audio editing through 134 tools spanning effects, plugins, cleanup, mastering, transcription, and more. Talk to your AI assistant and it edits your audio in real-time.
 
 **No cloud. No API keys for audio processing. Everything runs locally through Audacity's named pipe interface.**
 
@@ -148,11 +148,12 @@ AI:   select region → reverb effect → export to FLAC
 
 ## Features
 
-### 131 Tools Across 11 Categories
+### 134 Tools Across 12 Categories
 
 | Category | Tools | Highlights |
 |----------|-------|------------|
 | **Effects** | 30 | Reverb, echo, pitch shift, tempo change, EQ, phaser, distortion, paulstretch, HPF/LPF, bass & treble, tremolo, wahwah |
+| **Plugins** | 3 | Discover, inspect, and safely apply enabled Audacity plugin candidates |
 | **Cleanup & Mastering** | 18 | Noise reduction, compressor, limiter, 9 one-click pipelines, analysis tool |
 | **Editing** | 13 | Cut, copy, paste, split, join, trim, silence, duplicate, undo, redo |
 | **Project** | 12 | New, open, save, import/export (WAV, MP3, FLAC, OGG, AIFF) |
@@ -163,6 +164,32 @@ AI:   select region → reverb effect → export to FLAC
 | **Generation** | 5 | Tone, noise, chirp, DTMF, rhythm track |
 | **Transcription** (Experimental) | 7 | Full/selection transcribe, to labels, to SRT/VTT/TXT, model preload |
 | **Labels** | 6 | Add, add at time, get all, edit, import/export |
+
+### Dynamic Plugins
+
+`plugin_list` discovers enabled Effect, Generate, Analyze, and Tool candidates with
+search, category filters, and pagination. `plugin_get` returns the exact parameter
+schema reported by Audacity, and `plugin_apply` validates that schema before
+execution.
+
+Audacity does not distinguish built-in from third-party entries in its scripting
+metadata, so both are returned. Effect, Generate, and Analyze entries can be
+applied directly. Tool entries have broader automation capabilities and must be
+explicitly authorized by exact scripting ID:
+
+```text
+AUDACITY_MCP_ALLOWED_TOOL_PLUGINS=MyTrustedTool,AnotherTrustedTool
+```
+
+Discovery and category classification use stable scripting IDs rather than
+translated menu labels, so they work independently of Audacity's interface
+language. Names, parameter keys, and enum choices are preserved exactly as
+Audacity reports them.
+
+Plugins are trusted local code and cannot be sandboxed by AudacityMCP. Offline
+effects generally operate on the current selection; plugin installation,
+enable/disable management, and realtime effect stacks are not controlled by
+these tools.
 
 ---
 
@@ -423,6 +450,7 @@ AudacityMCP/
 │       ├── effects_tools.py    # Reverb, echo, pitch, EQ, filters
 │       ├── generate_tools.py   # Tone, noise, chirp, DTMF generation
 │       ├── label_tools.py      # Label management
+│       ├── plugin_tools.py     # Dynamic plugin discovery and safe execution
 │       ├── project_tools.py    # Project/file operations
 │       ├── selection_tools.py  # Selection and cursor control
 │       ├── track_tools.py      # Track management
@@ -432,7 +460,7 @@ AudacityMCP/
 │   ├── constants.py            # Pipe paths, timeouts, allowed formats
 │   ├── error_codes.py          # Typed error codes (pipe/command/validation)
 │   └── pipe_protocol.py        # Command formatting and response parsing
-├── tests/                      # 60 tests
+├── tests/                      # 112 tests
 ├── docs/
 │   ├── INSTALLATION.md         # Detailed setup guide
 │   └── TOOLS.md                # Complete tool reference
@@ -508,7 +536,7 @@ Your support helps keep this project maintained and free for everyone.
 ## Documentation
 
 - **[Installation Guide](docs/INSTALLATION.md)** — Detailed setup for Windows, macOS, Linux
-- **[Tool Reference](docs/TOOLS.md)** — Complete reference for all 131 tools with parameters and ranges
+- **[Tool Reference](docs/TOOLS.md)** — Complete reference for all 134 tools with parameters and ranges
 - **[Contributing](CONTRIBUTING.md)** — How to add tools and contribute
 - **[Changelog](CHANGELOG.md)** — Version history and release notes
 

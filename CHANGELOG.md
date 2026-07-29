@@ -2,6 +2,22 @@
 
 All notable changes to AudacityMCP will be documented in this file.
 
+## [Unreleased]
+
+### Dynamic Plugin Tools
+
+- Added `plugin_list`, `plugin_get`, and `plugin_apply` for compact discovery,
+  parameter inspection, and validated execution of enabled Audacity Effect,
+  Generate, Analyze, and Tool plugin candidates.
+- Plugin authorization cross-references Audacity command and menu metadata so
+  the feature cannot be used as a generic scripting-command escape hatch.
+- Tool candidates require an exact ID in
+  `AUDACITY_MCP_ALLOWED_TOOL_PLUGINS`; all dynamic parameters are checked
+  against Audacity's current schema before execution.
+- Added focused tests for language-agnostic metadata handling, pagination,
+  fail-closed discovery, authorization, injection protection, and parameter
+  validation.
+
 ## [0.1.13] - 2026-07-28
 
 ### Labels Overwriting Each Other
